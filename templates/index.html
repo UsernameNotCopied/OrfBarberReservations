@@ -41,13 +41,6 @@
         span.flatpickr-day { color: var(--text-main) !important; }
         span.flatpickr-day.selected { background: var(--accent) !important; border-color: var(--accent) !important; color: #ffffff !important; }
         span.flatpickr-day.flatpickr-disabled { color: #9ca3af !important; position: relative; }
-        span.flatpickr-day.flatpickr-disabled::after {
-            content: '';
-            position: absolute;
-            top: 32%; left: 32%; right: 32%; bottom: 32%;
-            background: linear-gradient(to top right, transparent 45%, #9ca3af 45%, #9ca3af 55%, transparent 55%);
-            pointer-events: none; opacity: 0.6;
-        }
     </style>
 </head>
 <body>
@@ -59,23 +52,23 @@
         <form action="/book" method="POST">
             <div class="form-group">
                 <label for="name">Your Name</label>
-                <input type="text" id="name" name="name" placeholder="e.g. John Doe" required>
+                <input type="text" id="name" name="name" placeholder="Your Name" required>
             </div>
             
             <div style="display: flex; gap: 16px;">
                 <div class="form-group" style="flex: 1;">
                     <label for="email">Email Address <span style="color: #9ca3af; font-weight: 400; font-size: 12px;">(Optional)</span></label>
-                    <input type="email" id="email" name="email" placeholder="john@example.com">
+                    <input type="email" id="email" name="email" placeholder="Your Email">
                 </div>
                 <div class="form-group" style="flex: 1;">
                     <label for="phone">Mobile Number</label>
-                    <input type="tel" id="phone" name="phone" placeholder="e.g. 555-0123" required>
+                    <input type="tel" id="phone" name="phone" placeholder="Your Mobile Number" required>
                 </div>
             </div>
 
             <div class="form-group">
                 <label for="date">Select Date</label>
-                <input type="text" id="date" name="date" placeholder="Choose a date first..." required>
+                <input type="text" id="date" name="date" placeholder="Choose a date first" required>
             </div>
             <div class="form-group">
                 <label for="time">Select Time</label>
@@ -131,14 +124,36 @@
 
         // Frontend form validation
         document.querySelector('form').addEventListener('submit', function(e) {
-            const name = document.getElementById('name').value.trim();
-            const phone = document.getElementById('phone').value.trim();
-            const date = document.getElementById('date').value.trim();
-            const time = document.getElementById('time').value;
+            const name = document.getElementById('name');
+            const email = document.getElementById('email');
+            const phone = document.getElementById('phone');
+            const date = document.getElementById('date');
+            const time = document.getElementById('time');
 
-            if (!name || !phone || !date || !time) {
-                e.preventDefault(); 
-                alert("Please complete all required fields: Name, Mobile Number, Date, and Time.");
+            const emailValue = email.value.trim();
+            const phoneValue = phone.value.trim();
+            const phoneDigitsOnly = phoneValue.replace(/\D/g, '');
+
+            email.setCustomValidity('');
+            phone.setCustomValidity('');
+
+
+            if (emailValue && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue)) {
+                e.preventDefault();
+                email.setCustomValidity('Please enter a valid email address.');
+                email.reportValidity();
+                return;
+            }
+
+            if (phoneValue && (phoneDigitsOnly.length < 10 || phoneDigitsOnly.length > 15)) {
+                e.preventDefault();
+                phone.setCustomValidity('Please enter a valid mobile number with 10 to 15 digits.');
+                phone.reportValidity();
+                return;
+            }
+
+            if (!name.value.trim() || !phoneValue || !date.value.trim() || !time.value) {
+                return;
             }
         });
     </script>

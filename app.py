@@ -1,3 +1,4 @@
+import re
 import sqlite3
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 from datetime import datetime, timedelta
@@ -37,6 +38,16 @@ def generate_all_slots():
         current_time += timedelta(minutes=30)
     return slots
 
+def is_valid_email(email):
+    if not email:
+        return True
+
+    return re.match(r'^[^\s@]+@[^\s@]+\.[^\s@]+$', email) is not None
+
+def is_valid_phone(phone):
+    digits_only = re.sub(r'\D', '', phone)
+
+    return 10 <= len(digits_only) <= 15
 # --- Public Routes ---
 @app.route('/')
 def index():
@@ -88,6 +99,12 @@ def book():
 
     if not client_name or not client_phone or not booking_date or not booking_time:
         return "Missing information.", 400
+
+    if not is_valid_email(client_email):
+        return "Invalid email address.", 400
+
+    if not is_valid_phone(client_phone):
+        return "Invalid mobile number.", 400
 
     conn = sqlite3.connect('bookings.db')
     cursor = conn.cursor()

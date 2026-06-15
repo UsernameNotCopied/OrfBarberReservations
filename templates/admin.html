@@ -156,7 +156,7 @@
                 
                 <div class="form-group" style="min-width: 120px;">
                     <label>From Time</label>
-                    <select name="start_time" class="block-input" required>
+                    <select name="start_time" id="start_time" class="block-input" required onchange="updateEndTimeOptions()">
                         <option value="08:00 AM">08:00 AM</option><option value="08:30 AM">08:30 AM</option>
                         <option value="09:00 AM">09:00 AM</option><option value="09:30 AM">09:30 AM</option>
                         <option value="10:00 AM">10:00 AM</option><option value="10:30 AM">10:30 AM</option>
@@ -175,7 +175,7 @@
                 
                 <div class="form-group" style="min-width: 120px;">
                     <label>To Time</label>
-                    <select name="end_time" class="block-input" required>
+                    <select name="end_time" id="end_time" class="block-input" required>
                         <option value="08:30 AM">08:30 AM</option><option value="09:00 AM">09:00 AM</option>
                         <option value="09:30 AM">09:30 AM</option><option value="10:00 AM">10:00 AM</option>
                         <option value="10:30 AM">10:30 AM</option><option value="11:00 AM">11:00 AM</option>
@@ -235,6 +235,11 @@
                 minDate: "today", 
                 dateFormat: "Y-m-d" 
             });
+
+            const savedTab = localStorage.getItem('adminActiveTab') || 'upcoming';
+            showTab(savedTab);
+
+            updateEndTimeOptions();
         });
 
         // Hide/Show Date input based on Block Rule selection
@@ -264,6 +269,48 @@
             
             document.getElementById('view-' + tabName).classList.add('active');
             document.getElementById('btn-' + tabName).classList.add('active');
+
+            localStorage.setItem('adminActiveTab', tabName);
+        }
+
+         function timeToMinutes(timeString) {
+            const parts = timeString.match(/(\d+):(\d+) (AM|PM)/);
+            let hours = parseInt(parts[1], 10);
+            const minutes = parseInt(parts[2], 10);
+            const period = parts[3];
+
+            if (period === 'PM' && hours !== 12) {
+                hours += 12;
+            }
+
+            if (period === 'AM' && hours === 12) {
+                hours = 0;
+            }
+
+            return hours * 60 + minutes;
+        }
+
+         function updateEndTimeOptions() {
+            const startSelect = document.getElementById('start_time');
+            const endSelect = document.getElementById('end_time');
+            const startMinutes = timeToMinutes(startSelect.value);
+
+            let firstValidEndTime = null;
+
+            Array.from(endSelect.options).forEach(function(option) {
+                const endMinutes = timeToMinutes(option.value);
+                const isValid = endMinutes > startMinutes;
+
+                option.disabled = !isValid;
+
+                if (isValid && firstValidEndTime === null) {
+                    firstValidEndTime = option.value;
+                }
+            });
+
+            if (timeToMinutes(endSelect.value) <= startMinutes && firstValidEndTime !== null) {
+                endSelect.value = firstValidEndTime;
+            }
         }
     </script>
 </body>
