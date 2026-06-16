@@ -1,28 +1,50 @@
+import os
 import re
-import sqlite3
+import pyodbc
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
 app.secret_key = 'super_secret_barber_key_123'
 
-# --- Database Initialization ---
+AZURE_SQL_CONNECTION_STRING = os.environ.get('AZURE_SQL_CONNECTION_STRING')
+
+def get_db_connection():
+    if not AZURE_SQL_CONNECTION_STRING:
+        raise RuntimeError("AZURE_SQL_CONNECTION_STRING environment variable is not set.")
+
+    return pyodbc.connect(AZURE_SQL_CONNECTION_STRING)
+
+
 def init_db():
-    conn = sqlite3.connect('bookings.db')
+    conn = get_db_connection()
     cursor = conn.cursor()
+
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS appointments (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL, email TEXT, phone TEXT NOT NULL,
-            date TEXT NOT NULL, time TEXT NOT NULL
+        IF NOT EXISTS (
+            SELECT * FROM sysobjects WHERE name='appointments' AND xtype='U'
+        )
+        CREATE TABLE appointments (
+            id INT IDENTITY(1,1) PRIMARY KEY,
+            name NVARCHAR(255) NOT NULL,
+            email NVARCHAR(255),
+            phone NVARCHAR(50) NOT NULL,
+            date NVARCHAR(20) NOT NULL,
+            time NVARCHAR(20) NOT NULL
         )
     ''')
+
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS blocked_times (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            date TEXT NOT NULL, time TEXT NOT NULL
+        IF NOT EXISTS (
+            SELECT * FROM sysobjects WHERE name='blocked_times' AND xtype='U'
+        )
+        CREATE TABLE blocked_times (
+            id INT IDENTITY(1,1) PRIMARY KEY,
+            date NVARCHAR(50) NOT NULL,
+            time NVARCHAR(20) NOT NULL
         )
     ''')
+
     conn.commit()
     conn.close()
 
@@ -59,9 +81,9 @@ def available_slots():
     if not selected_date:
         return jsonify([])
 
-    conn = sqlite3.connect('bookings.db')
+    conn = get_db_connection()
     cursor = conn.cursor()
-    
+
     # 1. Get booked appointments
     cursor.execute('SELECT time FROM appointments WHERE date = ?', (selected_date,))
     booked_times = [row[0] for row in cursor.fetchall()]
@@ -106,7 +128,7 @@ def book():
     if not is_valid_phone(client_phone):
         return "Invalid mobile number.", 400
 
-    conn = sqlite3.connect('bookings.db')
+    conn = get_db_connection()
     cursor = conn.cursor()
 
     # Double booking check
@@ -153,12 +175,11 @@ def login():
 @app.route('/admin')
 def admin():
     if not session.get('logged_in'): return redirect(url_for('login'))
-    
-    conn = sqlite3.connect('bookings.db')
+
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('SELECT * FROM appointments ORDER BY date ASC, time ASC')
     all_bookings = cursor.fetchall()
-    
     # Sort blocks so DAILY is at the top, then EVERY_*, then specific dates
     cursor.execute('''
         SELECT * FROM blocked_times 
@@ -192,7 +213,7 @@ def admin():
 @app.route('/delete/<int:id>', methods=['POST'])
 def delete_appointment(id):
     if not session.get('logged_in'): return redirect(url_for('login'))
-    conn = sqlite3.connect('bookings.db')
+    conn = get_db_connection()
     conn.cursor().execute('DELETE FROM appointments WHERE id = ?', (id,))
     conn.commit(); conn.close()
     return redirect(url_for('admin'))
@@ -218,7 +239,7 @@ def block_time():
             end_dt = datetime.strptime(end_time_str, '%I:%M %p')
             
             if start_dt < end_dt:
-                conn = sqlite3.connect('bookings.db')
+                conn = get_db_connection()
                 cursor = conn.cursor()
                 current_dt = start_dt
                 while current_dt < end_dt:
@@ -236,7 +257,7 @@ def block_time():
 @app.route('/admin/unblock/<int:id>', methods=['POST'])
 def unblock_time(id):
     if not session.get('logged_in'): return redirect(url_for('login'))
-    conn = sqlite3.connect('bookings.db')
+    conn = get_db_connection()
     conn.cursor().execute('DELETE FROM blocked_times WHERE id = ?', (id,))
     conn.commit(); conn.close()
     return redirect(url_for('admin'))
