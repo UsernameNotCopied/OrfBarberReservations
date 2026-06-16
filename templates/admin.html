@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard</title>
     <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='favicon.png') }}">
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
 
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     
@@ -13,7 +15,7 @@
         
         :root { 
             --bg: #f9fafb; --surface: #ffffff; --text-main: #111827; 
-            --text-muted: #6b7280; --danger: #ef4444; --border: #e5e7eb; --accent: #111827; 
+            --text-muted: #6b7280; --danger: #ef4444; --border: #e5e7eb; --accent: #111827;
         }
         
         body { font-family: 'Inter', sans-serif; background: var(--bg); margin: 0; padding: 20px; color: var(--text-main); }
