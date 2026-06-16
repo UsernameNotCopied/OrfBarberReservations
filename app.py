@@ -75,6 +75,10 @@ def is_valid_phone(phone):
 def index():
     return render_template('index.html')
 
+@app.route('/ping')
+def ping():
+    return "Server is up and running", 200
+
 @app.route('/api/available-slots')
 def available_slots():
     selected_date = request.args.get('date')
