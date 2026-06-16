@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard</title>
     <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
-    <link rel="apple-touch-icon" sizes="180x585" href="{{ url_for('static', filename='favicon.png') }}">
+    <link rel="apple-touch-icon" sizes="80x260" href="{{ url_for('static', filename='favicon.png') }}">
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
 
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
@@ -58,6 +58,48 @@
         .btn-submit:hover { background: #374151; }
 
         .footer { margin-top: 32px; text-align: center; color: var(--text-muted); font-size: 13px; }
+
+        /* --- Mobile Responsive Rules --- */
+        @media (max-width: 768px) {
+            body { padding: 12px; }
+            .container { 
+                margin: 0 auto; 
+                padding: 24px 20px; 
+            }
+            .header h1 { font-size: 20px; }
+            
+            /* Make tabs scrollable horizontally */
+            .tabs {
+                overflow-x: auto;
+                white-space: nowrap;
+                flex-wrap: nowrap;
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: none; /* Firefox */
+            }
+            .tabs::-webkit-scrollbar { display: none; /* Chrome/Safari */ }
+            .tab-btn { flex-shrink: 0; }
+
+            /* Make data tables scrollable horizontally without breaking layout */
+            .tab-content {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                margin-left: -20px; /* Bleeds scroll out to the edges for better UX */
+                margin-right: -20px;
+                padding-left: 20px;
+                padding-right: 20px;
+            }
+            table { min-width: 650px; /* Forces tables to remain wide enough to read */ }
+            
+            /* Stack the availability form vertically */
+            .block-form {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .btn-submit {
+                width: 100%;
+                margin-top: 12px;
+            }
+        }
     </style>
 </head>
 <body>

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Booking Confirmed</title>
     <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
-    <link rel="apple-touch-icon" sizes="180x585" href="{{ url_for('static', filename='favicon.png') }}">
+    <link rel="apple-touch-icon" sizes="80x260" href="{{ url_for('static', filename='favicon.png') }}">
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
 
     <style>
@@ -22,6 +22,14 @@
         
         .btn-outline { display: inline-block; border: 2px solid var(--border); color: var(--text-main); text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; transition: all 0.2s ease; }
         .btn-outline:hover { border-color: var(--text-main); background: var(--bg); }
+
+        /* --- Mobile Responsive Rules --- */
+        @media (max-width: 520px) {
+            .container {
+                margin: 8vh 16px 40px; /* Ensures the box doesn't touch screen edges */
+                padding: 32px 24px; /* Reduces inner padding to give text more room */
+            }
+        }
     </style>
 </head>
 <body>
