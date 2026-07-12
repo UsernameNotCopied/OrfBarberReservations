@@ -1,138 +1,69 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Barber Shop Booking</title>
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon-96x96.png') }}?v=20260617" sizes="96x96" />
-    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}?v=20260617" />
-    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}?v=20260617" />
-    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}?v=20260617" />
-    <meta name="apple-mobile-web-app-title" content="OrfBarber Reservations" />
-    <link rel="manifest" href="{{ url_for('static', filename='site.webmanifest') }}?v=20260617" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-    
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        
-        :root {
-            --bg: #f9fafb;
-            --surface: #ffffff;
-            --text-main: #111827;
-            --text-muted: #6b7280;
-            --accent: #111827;
-            --accent-hover: #374151;
-            --border: #e5e7eb;
-            --ring: rgba(17, 24, 39, 0.15);
-        }
-        body { font-family: 'Inter', sans-serif; background: var(--bg); margin: 0; padding: 0; color: var(--text-main); }
-        .container { max-width: 480px; margin: 8vh auto 40px; background: var(--surface); padding: 40px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-        h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.025em; }
-        a.nav-link { color: var(--text-muted); text-decoration: none; font-weight: 500; font-size: 14px; transition: color 0.2s; }
-        a.nav-link:hover { color: var(--text-main); }
-        
-        .form-group { margin-bottom: 20px; }
-        label { display: block; font-weight: 500; margin-bottom: 8px; color: var(--text-main); font-size: 14px; }
-        input, select { width: 100%; padding: 12px 16px; border: 1px solid var(--border); border-radius: 8px; font-size: 15px; font-family: 'Inter', sans-serif; transition: all 0.2s ease; box-sizing: border-box; background: #fff; }
-        input:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px var(--ring); }
-        select:disabled { background: #f3f4f6; color: #9ca3af; cursor: not-allowed; }
-        
-        .btn { background: var(--accent); color: #fff; border: none; padding: 14px; border-radius: 8px; width: 100%; font-size: 16px; font-weight: 600; cursor: pointer; transition: background 0.2s ease; margin-top: 8px; font-family: 'Inter', sans-serif; }
-        .btn:hover { background: var(--accent-hover); }
-        .footer { margin-top: 24px; text-align: center; color: var(--text-muted); font-size: 13px; }
+{% extends "base.html" %}
 
-        /* --- Layout Classes (Replaced Inline Styles) --- */
-        .contact-row { display: flex; gap: 16px; }
-        .flex-1 { flex: 1; }
+{% block title %}Book Your Haircut - Orf Barber{% endblock %}
 
-        /* --- Custom Calendar Styling --- */
-        span.flatpickr-day { color: var(--text-main) !important; }
-        span.flatpickr-day.selected { background: var(--accent) !important; border-color: var(--accent) !important; color: #ffffff !important; }
-        span.flatpickr-day.flatpickr-disabled { color: #9ca3af !important; position: relative; }
-
-        /* --- Mobile Responsive Rules --- */
-        @media (max-width: 520px) {
-            .container {
-                margin: 4vh 16px 40px; /* Ensures the box doesn't touch screen edges */
-                padding: 24px; /* Gives the form more breathing room on tiny screens */
-            }
-            .contact-row {
-                flex-direction: column; /* Stacks the email and phone inputs */
-                gap: 0; /* Removes gap since form-group handles bottom margin */
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>Book Your Haircut</h1>
-            <a href="/admin" class="nav-link">Admin Login</a>
-        </div>
-        <form action="/book" method="POST">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-            <div class="form-group">
-                <label for="name">Your Name</label>
-                <input type="text" id="name" name="name" placeholder="Your Name" required>
-            </div>
-            
-            <div class="contact-row">
-                <div class="form-group flex-1">
-                    <label for="email">Email Address <span style="color: #9ca3af; font-weight: 400; font-size: 12px;">(Optional)</span></label>
-                    <input type="email" id="email" name="email" placeholder="Your Email">
-                </div>
-                <div class="form-group flex-1">
-                    <label for="phone">Mobile Number</label>
-                    <input type="tel" id="phone" name="phone" placeholder="Your Mobile Number" required>
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label for="date">Select Date</label>
-                <input type="text" id="date" name="date" placeholder="Choose a date first" required>
-            </div>
-            <div class="form-group">
-                <label for="time">Select Time</label>
-                <select id="time" name="time" required disabled>
-                    <option value="" disabled selected>Please select a date first</option>
-                </select>
-            </div>
-            <button type="submit" class="btn">Confirm Reservation</button>
-        </form>
-        <div class="footer">© Orf Barber</div>
+{% block content %}
+    <div class="header header-simple">
+        <h1>Book Your Haircut</h1>
+        <a href="/admin" class="nav-link">Admin Login</a>
     </div>
+    <form action="/book" method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <div class="form-group">
+            <label for="name">Your Name</label>
+            <input type="text" id="name" name="name" placeholder="Your Name" required>
+        </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+        <div class="contact-row">
+            <div class="form-group flex-1">
+                <label for="email">Email Address <span style="color: #9ca3af; font-weight: 400; font-size: 12px;">(Optional)</span></label>
+                <input type="email" id="email" name="email" placeholder="Your Email">
+            </div>
+            <div class="form-group flex-1">
+                <label for="phone">Mobile Number</label>
+                <input type="tel" id="phone" name="phone" placeholder="Your Mobile Number" required>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="date">Select Date</label>
+            <input type="text" id="date" name="date" placeholder="Choose a date first" required>
+        </div>
+        <div class="form-group">
+            <label for="time">Select Time</label>
+            <select id="time" name="time" required disabled>
+                <option value="" disabled selected>Please select a date first</option>
+            </select>
+        </div>
+        <button type="submit" class="btn">Confirm Reservation</button>
+    </form>
+{% endblock %}
+
+{% block scripts %}
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             const timeSelect = document.getElementById('time');
 
             flatpickr("#date", {
                 minDate: "today",
+                // NEW: Restrict selection to a maximum of 7 days from today
+                maxDate: new Date().fp_incr(7),
                 dateFormat: "Y-m-d",
                 disableMobile: "true",
-                // This triggers every time the user picks a new date
-                onChange: function(selectedDates, dateStr, instance) {
-                    // Temporarily disable the dropdown and show loading state
+                onChange: function (selectedDates, dateStr, instance) {
                     timeSelect.disabled = true;
                     timeSelect.innerHTML = '<option value="" disabled selected>Loading available times...</option>';
 
-                    // Fetch the available slots from the backend API
                     fetch(`/api/available-slots?date=${dateStr}`)
                         .then(response => response.json())
                         .then(data => {
-                            // Reset the dropdown
                             timeSelect.innerHTML = '<option value="" disabled selected>Choose a time slot...</option>';
-                            
                             if (data.length === 0) {
                                 timeSelect.innerHTML = '<option value="" disabled selected>Fully booked for this date</option>';
                             } else {
-                                // Populate the dropdown with only the available slots
                                 data.forEach(slot => {
                                     timeSelect.innerHTML += `<option value="${slot}">${slot}</option>`;
                                 });
-                                // Re-enable the dropdown
                                 timeSelect.disabled = false;
                             }
                         })
@@ -144,8 +75,7 @@
             });
         });
 
-        // Frontend form validation
-        document.querySelector('form').addEventListener('submit', function(e) {
+        document.querySelector('form').addEventListener('submit', function (e) {
             const name = document.getElementById('name');
             const email = document.getElementById('email');
             const phone = document.getElementById('phone');
@@ -158,7 +88,6 @@
 
             email.setCustomValidity('');
             phone.setCustomValidity('');
-
 
             if (emailValue && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue)) {
                 e.preventDefault();
@@ -179,5 +108,4 @@
             }
         });
     </script>
-</body>
-</html>
+{% endblock %}

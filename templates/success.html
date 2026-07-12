@@ -1,48 +1,14 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon-96x96.png') }}?v=20260617" sizes="96x96" />
-    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}?v=20260617" />
-    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}?v=20260617" />
-    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}?v=20260617" />
-    <meta name="apple-mobile-web-app-title" content="OrfBarber Reservations" />
-    <link rel="manifest" href="{{ url_for('static', filename='site.webmanifest') }}?v=20260617" />
+{% extends "base.html" %}
 
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        
-        :root { --bg: #f9fafb; --surface: #ffffff; --text-main: #111827; --text-muted: #6b7280; --success: #10b981; --border: #e5e7eb; }
-        body { font-family: 'Inter', sans-serif; background: var(--bg); margin: 0; padding: 0; color: var(--text-main); }
-        .container { max-width: 480px; margin: 12vh auto; background: var(--surface); padding: 48px 40px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); text-align: center; }
-        
-        .icon { font-size: 48px; margin-bottom: 16px; }
-        h1 { margin: 0 0 16px 0; font-size: 24px; font-weight: 700; letter-spacing: -0.025em; color: var(--success); }
-        p { margin: 0 0 32px 0; font-size: 16px; color: var(--text-muted); line-height: 1.5; }
-        strong { color: var(--text-main); font-weight: 600; }
-        
-        .btn-outline { display: inline-block; border: 2px solid var(--border); color: var(--text-main); text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; transition: all 0.2s ease; }
-        .btn-outline:hover { border-color: var(--text-main); background: var(--bg); }
+{% block title %}Appointment Confirmed! - Orf Barber{% endblock %}
 
-        /* --- Mobile Responsive Rules --- */
-        @media (max-width: 520px) {
-            .container {
-                margin: 8vh 16px 40px; /* Ensures the box doesn't touch screen edges */
-                padding: 32px 24px; /* Reduces inner padding to give text more room */
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="icon">🎉</div>
-        <h1>Appointment Confirmed!</h1>
-        <p>
-            Thank you, <strong>{{ name }}</strong>.<br>
-            We have you down for <strong>{{ date }}</strong> at <strong>{{ time }}</strong>.<br>
-        </p>
-        <a href="/" class="btn-outline">Book another appointment</a>
-    </div>
-</body>
-</html>
+{% block content %}
+<div style="text-align: center; padding: 20px 0;">
+    <h1 style="color: var(--success); margin-bottom: 16px;">Appointment Confirmed!</h1>
+    <p style="color: var(--text-muted); font-size: 16px; line-height: 1.5; margin-bottom: 32px;">
+        Thank you, <strong style="color: var(--text-main);">{{ name }}</strong>.<br>
+        We have you down for <strong style="color: var(--text-main);">{{ date }}</strong> at <strong style="color: var(--text-main);">{{ time }}</strong>.
+    </p>
+    <a href="/" class="btn-outline">Book another appointment</a>
+</div>
+{% endblock %}

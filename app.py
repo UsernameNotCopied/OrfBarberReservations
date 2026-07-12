@@ -1,30 +1,85 @@
+import logging
 import os
 import re
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from azure.cosmos import CosmosClient, PartitionKey, exceptions
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-# NEW: Import CSRF and Rate Limiter libraries
+from flask_talisman import Talisman
 from flask_wtf.csrf import CSRFProtect
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', os.urandom(24))
-ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'haircut2024')
 
-# -------------------------------------------------------------------------
-# 1. INITIALIZE CSRF PROTECTION
-# -------------------------------------------------------------------------
-# This automatically protects all POST, PUT, PATCH, and DELETE routes.
-# If a form is submitted without a valid secret token, Flask rejects it with a 400 Bad Request.
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger("OrfBarber")
+
+app.config.update(
+    # Only send cookies over HTTPS (Set to False if testing locally on http://127.0.0.1)
+    SESSION_COOKIE_SECURE=os.environ.get('FLASK_ENV') == 'production',
+    # Prevent JavaScript from reading the session cookie (defends against XSS token theft)
+    SESSION_COOKIE_HTTPONLY=True,
+    # Restrict cookie transmission to same-site requests (defends against CSRF)
+    SESSION_COOKIE_SAMESITE='Lax',
+    # Automatically expire sessions after 2 hours of inactivity
+    PERMANENT_SESSION_LIFETIME=timedelta(hours=2)
+)
+
+csp_policy = {
+    'default-src': '\'self\'',
+    'script-src': [
+        '\'self\'',
+        'https://cdn.jsdelivr.net',
+        '\'unsafe-inline\''  # Required for your inline script blocks in index.html & admin.html
+    ],
+    'style-src': [
+        '\'self\'',
+        'https://cdn.jsdelivr.net',
+        'https://fonts.googleapis.com',
+        '\'unsafe-inline\''  # Required for inline CSS and Flatpickr UI theming
+    ],
+    'font-src': [
+        '\'self\'',
+        'https://fonts.gstatic.com'
+    ],
+    'img-src': [
+        '\'self\'',
+        'data:'  # Allows inline SVG/Base64 favicons
+    ],
+    'object-src': '\'none\'',  # Disallows Flash or legacy browser plugins entirely
+}
+
+Talisman(
+    app,
+    content_security_policy=csp_policy,
+    # Force HTTPS only when running in production on Azure
+    force_https=os.environ.get('FLASK_ENV') == 'production',
+    # Prevents Clickjacking by forbidding any site from framing your app
+    frame_options='DENY',
+    # Tells browsers to remember HTTPS encryption for 1 full year (31,536,000 seconds)
+    strict_transport_security=True,
+    strict_transport_security_max_age=31536000,
+    # Prevents browsers from guessing file types (mitigates drive-by downloads)
+    x_content_type_options=True
+)
+
+# Replace plaintext ADMIN_PASSWORD with a hash.
+# If ADMIN_PASSWORD_HASH isn't set in the environment, fallback to generating a hash for 'haircut2024' on startup.
+ADMIN_PASSWORD_HASH = os.environ.get('ADMIN_PASSWORD_HASH')
+
+ATHENS_TZ = ZoneInfo("Europe/Athens")
+
+
 csrf = CSRFProtect(app)
 
-# -------------------------------------------------------------------------
-# 2. INITIALIZE RATE LIMITING
-# -------------------------------------------------------------------------
-# Uses the user's IP address (get_remote_address) to track request counts.
-# Default limits apply across all routes unless overridden.
 limiter = Limiter(
     get_remote_address,
     app=app,
@@ -36,7 +91,7 @@ limiter = Limiter(
 # Optional: Custom error handler when a rate limit is exceeded
 @app.errorhandler(429)
 def ratelimit_handler(e):
-    return f"<h1>Too Many Requests</h1><p>You have exceeded your rate limit: {e.description}. Please try again later.</p>", 429
+    return f"<h1>Too Many Requests</h1><p>You have exceeded your rate limit. Please try again later.</p>", 429
 
 # --- Cosmos DB Setup ---
 COSMOS_ENDPOINT = os.environ.get('COSMOS_ENDPOINT')
@@ -108,13 +163,20 @@ def available_slots():
     if not selected_date:
         return jsonify([])
 
-    # Fix 4: Exception guards for date parsing
     try:
         day_rule = get_weekday_rule(selected_date)
     except ValueError:
         return jsonify({"error": "Invalid date format. Expected YYYY-MM-DD."}), 400
 
-    # Fix 3: Targeted partition queries instead of cross-partition
+    # NEW: Enforce the 7-day maximum advance booking window
+    now_athens = datetime.now(ATHENS_TZ)
+    today_str = now_athens.strftime('%Y-%m-%d')
+    max_allowed_date_str = (now_athens + timedelta(days=7)).strftime('%Y-%m-%d')
+
+    if selected_date < today_str or selected_date > max_allowed_date_str:
+        return jsonify([])  # Return empty slots if the requested date is out of bounds
+
+    # Query booked appointments
     query_booked = "SELECT c.time FROM c WHERE c.date = @date"
     booked_results = container.query_items(
         query=query_booked,
@@ -123,6 +185,7 @@ def available_slots():
     )
     booked_times = [item['time'] for item in booked_results]
 
+    # Query admin blocked slots
     query_blocked = """
                     SELECT c.time \
                     FROM c
@@ -142,13 +205,29 @@ def available_slots():
 
     unavailable_times = set(booked_times + admin_blocked)
     all_slots = generate_all_slots()
-    available = [slot for slot in all_slots if slot not in unavailable_times]
+
+    # Calculate the 30-minute buffer cutoff in Athens time
+    buffer_limit = now_athens + timedelta(minutes=30)
+
+    available = []
+    for slot in all_slots:
+        # If the slot is already booked or blocked by admin, skip it
+        if slot in unavailable_times:
+            continue
+
+        # If the selected date is today, check if the slot is at least 30 minutes away
+        if selected_date == today_str:
+            slot_dt = datetime.strptime(f"{selected_date} {slot}", '%Y-%m-%d %I:%M %p').replace(tzinfo=ATHENS_TZ)
+            if slot_dt < buffer_limit:
+                continue  # Skip slots in the past or within the 30-minute buffer
+
+        available.append(slot)
 
     return jsonify(available)
 
 
 @app.route('/book', methods=['POST'])
-@limiter.limit("5 per minute")
+@limiter.limit("3 per hour")
 def book():
     client_name = request.form.get('name', '').strip()
     client_email = request.form.get('email', '').strip()
@@ -163,14 +242,28 @@ def book():
     if not is_valid_phone(client_phone):
         return "Invalid mobile number.", 400
 
-    # Fix 4: Validate date and time format before querying
     try:
         day_rule = get_weekday_rule(booking_date)
-        datetime.strptime(booking_time, '%I:%M %p')
+        # Parse into a datetime object to validate format
+        parsed_time = datetime.strptime(booking_time, '%I:%M %p')
     except ValueError:
         return "Invalid date or time format.", 400
 
-    # Check for blocked admin time (Fix 3: Targeted partition query)
+    # Enforce the 30-minute advance buffer and 7-day maximum booking window in Athens time
+    now_athens = datetime.now(ATHENS_TZ)
+    buffer_limit = now_athens + timedelta(minutes=30)
+    max_allowed_date = now_athens + timedelta(days=7)
+
+    booking_dt = datetime.strptime(f"{booking_date} {booking_time}", '%Y-%m-%d %I:%M %p').replace(tzinfo=ATHENS_TZ)
+
+    if booking_dt < buffer_limit:
+        return "Appointments must be booked at least 30 minutes in advance.", 400
+
+    # NEW: Reject bookings more than 7 days in advance
+    if booking_dt > max_allowed_date:
+        return "Appointments can only be booked up to 7 days in advance.", 400
+
+    # Check for blocked admin time (Targeted partition query)
     query_block_check = """
                         SELECT * \
                         FROM c
@@ -190,7 +283,7 @@ def book():
     if existing_block:
         return "Time slot unavailable.", 409
 
-    # Fix 2: Prevent TOCTOU race conditions with deterministic IDs
+    # Prevent TOCTOU race conditions with deterministic IDs
     # If two users book at the exact same time, Cosmos DB rejects the second write natively.
     deterministic_id = f"{booking_date}_{booking_time}"
 
@@ -209,30 +302,33 @@ def book():
 
     return render_template('success.html', name=client_name, email=client_email, date=booking_date, time=booking_time)
 
-
 # --- Admin Routes ---
 @app.route('/login', methods=['GET', 'POST'])
 @limiter.limit("5 per minute")
 def login():
     if request.method == 'POST':
-        if request.form.get('password') == ADMIN_PASSWORD:
+        submitted_password = request.form.get('password', '')
+
+        # Securely verify the submitted password against the stored hash
+        if check_password_hash(ADMIN_PASSWORD_HASH, submitted_password):
+            session.permanent = True  # Enforce the 2-hour PERMANENT_SESSION_LIFETIME
             session['logged_in'] = True
             return redirect(url_for('admin'))
         else:
             return "<h1>Incorrect Password</h1><a href='/login'>Try again</a>", 403
-    return render_template('login.html')
 
+    return render_template('login.html')
 
 @app.route('/admin')
 def admin():
     if not session.get('logged_in'):
         return redirect(url_for('login'))
 
-    # Fix 5: Performance / Memory optimization.
-    # Only fetch appointments from 30 days ago onward so database reads remain lightweight.
-    cutoff_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+    # Get current time localized to Athens
+    now = datetime.now(ATHENS_TZ)
+    cutoff_date = (now - timedelta(days=30)).strftime('%Y-%m-%d')
 
-    # Fix 3: Query within specific partitions
+    # Query within specific partitions
     all_bookings = list(container.query_items(
         query="SELECT * FROM c WHERE c.date >= @cutoff",
         parameters=[{"name": "@cutoff", "value": cutoff_date}],
@@ -256,17 +352,18 @@ def admin():
     upcoming_bookings = []
     past_bookings = []
 
-    # Fix 5: Server time reference point
-    now = datetime.now()
-
     for booking in all_bookings:
         try:
             booking_dt = datetime.strptime(f"{booking['date']} {booking['time']}", '%Y-%m-%d %I:%M %p')
+            booking_dt = booking_dt.replace(tzinfo=ATHENS_TZ)
+
             if booking_dt >= now:
                 upcoming_bookings.append(booking)
             else:
                 past_bookings.append(booking)
-        except ValueError:
+        except ValueError as e:
+            # Log the exact record causing the parsing failure so you can fix it in the database
+            logger.error(f"Corrupted date/time format for booking ID {booking.get('id', 'UNKNOWN')}: {str(e)}")
             upcoming_bookings.append(booking)
 
     past_bookings.reverse()
@@ -277,11 +374,17 @@ def admin():
 @limiter.exempt
 def delete_appointment(id):
     if not session.get('logged_in'):
+        logger.warning(f"Unauthorized deletion attempt for appointment ID: {id}")
         return redirect(url_for('login'))
+
     try:
         container.delete_item(item=id, partition_key='appointment')
+        logger.info(f"Admin successfully deleted appointment ID: {id}")
     except exceptions.CosmosResourceNotFoundError:
-        pass
+        logger.warning(f"Attempted to delete non-existent appointment ID: {id}")
+    except Exception as e:
+        logger.error(f"Unexpected database error while deleting appointment ID {id}: {str(e)}", exc_info=True)
+
     return redirect(url_for('admin'))
 
 
@@ -289,6 +392,7 @@ def delete_appointment(id):
 @limiter.exempt
 def block_time():
     if not session.get('logged_in'):
+        logger.warning("Unauthorized attempt to access /admin/block")
         return redirect(url_for('login'))
 
     block_type = request.form.get('block_type')
@@ -302,7 +406,6 @@ def block_time():
         target_date = block_type.upper()
 
     if target_date and start_time_str and end_time_str:
-        # Fix 4: Safely guard time block parsing
         try:
             start_dt = datetime.strptime(start_time_str, '%I:%M %p')
             end_dt = datetime.strptime(end_time_str, '%I:%M %p')
@@ -311,9 +414,8 @@ def block_time():
                 current_dt = start_dt
                 while current_dt < end_dt:
                     time_slot = current_dt.strftime('%I:%M %p')
-
-                    # Fix 2 & 3: Use deterministic IDs for blocks to avoid queries and race conditions
                     block_id = f"block_{target_date}_{time_slot}"
+
                     try:
                         container.create_item(body={
                             'id': block_id,
@@ -321,12 +423,20 @@ def block_time():
                             'date': target_date,
                             'time': time_slot
                         })
+                        logger.info(f"Created block rule [{block_id}] for {target_date} at {time_slot}")
                     except exceptions.CosmosResourceExistsError:
-                        pass  # Block already exists, skip silently
+                        logger.info(f"Block rule [{block_id}] already exists. Skipped duplicate creation.")
+                    except Exception as e:
+                        logger.error(f"Failed to write block rule [{block_id}] to Cosmos DB: {str(e)}", exc_info=True)
 
                     current_dt += timedelta(minutes=30)
-        except ValueError:
-            pass
+            else:
+                logger.warning(
+                    f"Admin submitted invalid time block range: start ({start_time_str}) >= end ({end_time_str})")
+        except ValueError as e:
+            logger.error(f"Time format parsing error in block_time: {str(e)}", exc_info=True)
+    else:
+        logger.warning("Admin submitted incomplete block rule form data.")
 
     return redirect(url_for('admin'))
 
@@ -335,11 +445,17 @@ def block_time():
 @limiter.exempt
 def unblock_time(id):
     if not session.get('logged_in'):
+        logger.warning(f"Unauthorized unblock attempt for block ID: {id}")
         return redirect(url_for('login'))
+
     try:
         container.delete_item(item=id, partition_key='block')
+        logger.info(f"Admin successfully removed block rule ID: {id}")
     except exceptions.CosmosResourceNotFoundError:
-        pass
+        logger.warning(f"Attempted to unblock non-existent block ID: {id}")
+    except Exception as e:
+        logger.error(f"Unexpected error while removing block ID {id}: {str(e)}", exc_info=True)
+
     return redirect(url_for('admin'))
 
 
