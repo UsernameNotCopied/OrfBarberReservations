@@ -4,6 +4,28 @@
 {% block container_class %}container-lg{% endblock %}
 
 {% block content %}
+<style>
+    /* Base badge styling for all blocked time rules */
+    .badge-rule {
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 600;
+        display: inline-block;
+    }
+
+    /* Distinct colors for each recurring rule */
+    .rule-DAILY           { background: #f3e8ff; color: #6b21a8; } /* Purple */
+    .rule-EVERY_MONDAY    { background: #dbeafe; color: #1e40af; } /* Blue */
+    .rule-EVERY_TUESDAY   { background: #e0e7ff; color: #3730a3; } /* Indigo */
+    .rule-EVERY_WEDNESDAY { background: #fce7f3; color: #9d174d; } /* Pink */
+    .rule-EVERY_THURSDAY  { background: #fef3c7; color: #92400e; } /* Amber */
+    .rule-EVERY_FRIDAY    { background: #ccfbf1; color: #115e59; } /* Teal */
+    .rule-EVERY_SATURDAY  { background: #ffedd5; color: #9a3412; } /* Orange */
+    .rule-EVERY_SUNDAY    { background: #dcfce7; color: #166534; } /* Green */
+    .rule-SPECIFIC        { background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; } /* Slate Gray */
+</style>
+
 <div class="header">
     <h1>Reservations Dashboard</h1>
     <a href="/logout" class="logout">Log Out</a>
@@ -135,6 +157,8 @@
                 <option value="06:00 PM">06:00 PM</option><option value="06:30 PM">06:30 PM</option>
                 <option value="07:00 PM">07:00 PM</option><option value="07:30 PM">07:30 PM</option>
                 <option value="08:00 PM">08:00 PM</option><option value="08:30 PM">08:30 PM</option>
+                <option value="09:00 PM">09:00 PM</option><option value="09:30 PM">09:30 PM</option>
+                <option value="10:00 PM">10:00 PM</option>
             </select>
         </div>
 
@@ -154,12 +178,14 @@
                 <option value="06:30 PM">06:30 PM</option><option value="07:00 PM">07:00 PM</option>
                 <option value="07:30 PM">07:30 PM</option><option value="08:00 PM">08:00 PM</option>
                 <option value="08:30 PM">08:30 PM</option><option value="09:00 PM">09:00 PM</option>
+                <option value="09:30 PM">09:30 PM</option><option value="10:00 PM">10:00 PM</option>
+                <option value="10:30 PM">10:30 PM</option>
             </select>
         </div>
         <button type="submit" class="btn-submit">Block Range</button>
     </form>
 
-    <table>
+   <table>
         <thead>
             <tr><th>Rule / Date</th><th>Time Slot</th><th>Status</th><th>Action</th></tr>
         </thead>
@@ -168,11 +194,11 @@
             <tr>
                 <td style="font-weight: 500;">
                     {% if block.date == 'DAILY' %}
-                        <span style="background: #dbeafe; color: #1e3a8a; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600;">Every Day</span>
+                        <span class="badge-rule rule-DAILY">Every Day</span>
                     {% elif block.date.startswith('EVERY_') %}
-                        <span style="background: #fef08a; color: #854d0e; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600;">{{ block.date.replace('_', ' ').title() }}</span>
+                        <span class="badge-rule rule-{{ block.date }}">{{ block.date.replace('EVERY_', '').title() }}</span>
                     {% else %}
-                        {{ block.date }}
+                        <span class="badge-rule rule-SPECIFIC">{{ block.date }}</span>
                     {% endif %}
                 </td>
                 <td>{{ block.time }}</td>

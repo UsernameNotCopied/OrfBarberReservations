@@ -77,7 +77,6 @@ ADMIN_PASSWORD_HASH = os.environ.get('ADMIN_PASSWORD_HASH')
 
 ATHENS_TZ = ZoneInfo("Europe/Athens")
 
-
 csrf = CSRFProtect(app)
 
 limiter = Limiter(
@@ -92,6 +91,7 @@ limiter = Limiter(
 @app.errorhandler(429)
 def ratelimit_handler(e):
     return f"<h1>Too Many Requests</h1><p>You have exceeded your rate limit. Please try again later.</p>", 429
+
 
 # --- Cosmos DB Setup ---
 COSMOS_ENDPOINT = os.environ.get('COSMOS_ENDPOINT')
@@ -113,11 +113,11 @@ container = database.create_container_if_not_exists(
 )
 
 
-# --- Helper Functions ---
 def generate_all_slots():
     slots = []
     start_time = datetime.strptime('08:00 AM', '%I:%M %p')
-    end_time = datetime.strptime('09:00 PM', '%I:%M %p')
+    # Change end_time from 09:00 PM to 10:00 PM
+    end_time = datetime.strptime('10:00 PM', '%I:%M %p')
     current_time = start_time
     while current_time <= end_time:
         slots.append(current_time.strftime('%I:%M %p'))
@@ -148,11 +148,13 @@ def get_weekday_rule(date_str):
 
 # --- Public Routes ---
 @app.route('/')
+@limiter.exempt
 def index():
     return render_template('index.html')
 
 
 @app.route('/ping')
+@limiter.exempt
 def ping():
     return "Server is up and running", 200
 
@@ -168,7 +170,7 @@ def available_slots():
     except ValueError:
         return jsonify({"error": "Invalid date format. Expected YYYY-MM-DD."}), 400
 
-    # NEW: Enforce the 7-day maximum advance booking window
+    # Enforce the 7-day maximum advance booking window
     now_athens = datetime.now(ATHENS_TZ)
     today_str = now_athens.strftime('%Y-%m-%d')
     max_allowed_date_str = (now_athens + timedelta(days=7)).strftime('%Y-%m-%d')
@@ -259,7 +261,7 @@ def book():
     if booking_dt < buffer_limit:
         return "Appointments must be booked at least 30 minutes in advance.", 400
 
-    # NEW: Reject bookings more than 7 days in advance
+    # Reject bookings more than 7 days in advance
     if booking_dt > max_allowed_date:
         return "Appointments can only be booked up to 7 days in advance.", 400
 
@@ -302,6 +304,7 @@ def book():
 
     return render_template('success.html', name=client_name, email=client_email, date=booking_date, time=booking_time)
 
+
 # --- Admin Routes ---
 @app.route('/login', methods=['GET', 'POST'])
 @limiter.limit("5 per minute")
@@ -318,6 +321,7 @@ def login():
             return "<h1>Incorrect Password</h1><a href='/login'>Try again</a>", 403
 
     return render_template('login.html')
+
 
 @app.route('/admin')
 def admin():
@@ -342,10 +346,23 @@ def admin():
         partition_key="block"
     ))
 
+    # --- UPDATED CHRONOLOGICAL SORTING FUNCTION ---
     def block_sort_key(b):
         date_val = b['date']
+
+        # 1. Group by rule priority: Daily -> Weekly -> Specific Dates
         priority = 1 if date_val == 'DAILY' else (2 if date_val.startswith('EVERY_') else 3)
-        return (priority, date_val, b['time'])
+
+        # 2. Convert 'hh:mm AM/PM' string into a real Python datetime object
+        # This forces Python to sort by actual time of day (e.g., 08:00 before 13:00)
+        try:
+            time_obj = datetime.strptime(b['time'], '%I:%M %p')
+        except ValueError:
+            time_obj = datetime.min  # Fallback safety if data is corrupted
+
+        return (priority, date_val, time_obj)
+
+    # ----------------------------------------------
 
     blocked_times.sort(key=block_sort_key)
 
